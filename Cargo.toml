@@ -2,6 +2,7 @@
 name = "alfred-crates"
 version = "1.0.3-alpha.0"
 authors = ["François-Guillaume Ribreau <rust@fgribreau.com>"]
+edition = "2021"
 
 # A short blurb about the package. This is not rendered in any format when
 # uploaded to crates.io (aka this is not markdown).
@@ -41,6 +42,7 @@ include = ["src/main.rs", "Cargo.toml", "info.plist", "info.png"]
 crates-io = "0.24"
 curl = "0.4.22"
 alfred = "4.0.1"
+eyre = "0.6.8"
 
 
 [dependencies.clap]

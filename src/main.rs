@@ -1,16 +1,13 @@
-extern crate alfred;
-extern crate clap;
-extern crate crates_io;
-extern crate curl;
-
 use clap::{App, Arg};
 use crates_io::{Crate, Registry};
 use curl::easy::Easy;
+use eyre::{Result, WrapErr};
+use std::borrow::Cow;
 use std::io;
 
-const HOST: &'static str = "https://crates.io";
+const HOST: &str = "https://crates.io";
 
-fn main() {
+fn main() -> Result<()> {
     // access metadata from cargo package http://stackoverflow.com/a/27841363/745121
     let args = App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
@@ -32,46 +29,46 @@ fn main() {
     let query = args.value_of("query").unwrap();
     let mut registry = Registry::new_handle(String::from(HOST), None, easy_client);
 
-    let mut json = false;
-    match registry.search(&query, 10) {
+    match registry.search(query, 10) {
         Ok((crates, _)) => {
-            if let Some(version) = alfred::env::version() {
-                if version.starts_with("1") || version.starts_with("2") {
-                    // only XML support
-                    json = false;
-                } else {
-                    // JSON support
-                    json = true;
-                }
-            }
-            workflow_output(crates, json);
-            return ();
+            let json = if let Some(version) = alfred::env::version() {
+                !(version.starts_with('1') || version.starts_with('2'))
+            } else {
+                false
+            };
+            workflow_output(crates, json)
         }
         Err(_) => {
             // @todo find a way in alfred to inform about the error
-            workflow_output(vec![], json)
+            workflow_output(vec![], false)
         }
     }
 }
 
-fn workflow_output(crates: Vec<Crate>, json: bool) {
+fn workflow_output(crates: Vec<Crate>, json: bool) -> Result<()> {
     let items = crates
         .into_iter()
         .map(|item| {
-            let url = format!("{}/crates/{}", HOST, item.name);
+            let url = Cow::from(format!("{}/crates/{}", HOST, item.name));
+            let description = item.description.map(Cow::from).unwrap_or_else(Cow::default);
+
             alfred::ItemBuilder::new(item.name)
                 .arg(url.clone())
                 .quicklook_url(url)
-                .text_large_type(item.description.clone().unwrap_or(String::from("")))
-                .subtitle(item.description.unwrap_or(String::from("")))
+                .text_large_type(description.clone())
+                .subtitle(description)
                 .into_item()
         })
         .collect::<Vec<alfred::Item>>();
+
+    let stdout = io::stdout().lock();
     if json {
         alfred::json::Builder::with_items(&items)
-            .write(io::stdout())
-            .expect("Couldn't write items to Alfred");
+            .write(stdout)
+            .wrap_err_with(|| "Couldn't write items to Alfred")?;
     } else {
-        alfred::xml::write_items(io::stdout(), &items).expect("Couldn't write items to Alfred");
+        alfred::xml::write_items(stdout, &items)
+            .wrap_err_with(|| "Couldn't write items to Alfred")?;
     }
+    Ok(())
 }
