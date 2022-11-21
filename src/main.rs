@@ -6,6 +6,7 @@ use std::borrow::Cow;
 use std::io;
 
 const HOST: &str = "https://crates.io";
+const DOCS: &str = "https://docs.rs";
 
 fn main() -> Result<()> {
     // access metadata from cargo package http://stackoverflow.com/a/27841363/745121
@@ -52,11 +53,16 @@ fn workflow_output(crates: Vec<Crate>, json: bool) -> Result<()> {
             let url = Cow::from(format!("{}/crates/{}", HOST, item.name));
             let description = item.description.map(Cow::from).unwrap_or_else(Cow::default);
 
+            let docs_url = Cow::from(format!("{}/{}", DOCS, item.name));
+            let docs_subtitle = format!("Docs for {}", item.name);
+
             alfred::ItemBuilder::new(item.name)
                 .arg(url.clone())
+                .arg_mod(alfred::Modifier::Command, docs_url)
                 .quicklook_url(url)
                 .text_large_type(description.clone())
                 .subtitle(description)
+                .subtitle_mod(alfred::Modifier::Command, docs_subtitle)
                 .into_item()
         })
         .collect::<Vec<alfred::Item>>();
